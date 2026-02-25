@@ -104,6 +104,9 @@ class UserDashboardActivity : AppCompatActivity() {
             try {
                 val response = RetrofitClient.api.assignTablet(token, AssignRequest(device_id = serial))
                 if (response.isSuccessful) {
+
+                    SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign)
+
                     Toast.makeText(this@UserDashboardActivity, "Assigned Successfully!", Toast.LENGTH_LONG).show()
                     loadData()
                 } else {
@@ -178,6 +181,8 @@ class UserDashboardActivity : AppCompatActivity() {
                 val response = RetrofitClient.api.verifyReturn(token, req)
 
                 if (response.isSuccessful) {
+                    SoundManager.play(this@UserDashboardActivity, R.raw.melody_return)
+
                     Toast.makeText(this@UserDashboardActivity, "Success! Device Returned.", Toast.LENGTH_LONG).show()
                     loadData() // Refresh list to remove the device
                 } else {

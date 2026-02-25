@@ -45,6 +45,8 @@ class LoginActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val auth = response.body()!!
 
+                        SoundManager.play(this@LoginActivity, R.raw.melody_login)
+
                         // Save Token & Role
                         SessionManager.saveAuth(this@LoginActivity, auth.access, auth.user.role)
 
