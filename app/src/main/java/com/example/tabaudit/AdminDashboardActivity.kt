@@ -16,7 +16,7 @@ class AdminDashboardActivity : AppCompatActivity() {
 
     // UI Containers
     private lateinit var containerReturns: LinearLayout
-    private lateinit var containerActiveLoans: LinearLayout // Changed from containerOtps
+    private lateinit var containerActiveLoans: LinearLayout
     private lateinit var containerStock: LinearLayout
     private lateinit var containerLogs: LinearLayout
 
@@ -37,7 +37,9 @@ class AdminDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                val response = RetrofitClient.api.getDashboardStats(token)
+                // --- FIX 1: Use getApi(this) ---
+                val response = RetrofitClient.getApi(this@AdminDashboardActivity).getDashboardStats(token)
+
                 if (response.isSuccessful && response.body() != null) {
                     val data = response.body()!!
                     populateUI(data)
@@ -73,12 +75,9 @@ class AdminDashboardActivity : AppCompatActivity() {
             addTextToContainer(containerActiveLoans, "No active loans", isBold = false)
         } else {
             for (loan in data.active_loans) {
-                // Format: "John Doe (EMP01)"
-                //         "Galaxy Tab A (S/N: 123)"
                 val text = "${loan.username} (${loan.employee_id})\n${loan.tab_name}\nS/N: ${loan.serial}"
                 addTextToContainer(containerActiveLoans, text, isBold = false, color = Color.parseColor("#0D47A1")) // Dark Blue
 
-                // Divider
                 val divider = TextView(this)
                 divider.height = 1
                 divider.setBackgroundColor(Color.LTGRAY)
@@ -97,7 +96,6 @@ class AdminDashboardActivity : AppCompatActivity() {
         containerLogs.removeAllViews()
         for (log in data.recent_activity) {
             val action = if(log.quantity > 0) "Took" else "Returned"
-            // Formatting timestamp for cleaner look (optional, keeping it simple for now)
             val text = "${log.username} $action ${log.tab_name}"
             addTextToContainer(containerLogs, text, isBold = false)
 

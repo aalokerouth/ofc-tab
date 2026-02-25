@@ -86,7 +86,8 @@ class UserDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                val response = RetrofitClient.api.getMyDevices(token)
+                // --- FIX 1: Use getApi(this) ---
+                val response = RetrofitClient.getApi(this@UserDashboardActivity).getMyDevices(token)
                 if (response.isSuccessful) {
                     adapter.updateList(response.body() ?: emptyList())
                 }
@@ -102,11 +103,11 @@ class UserDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                val response = RetrofitClient.api.assignTablet(token, AssignRequest(device_id = serial))
+                // --- FIX 2: Use getApi(this) ---
+                val response = RetrofitClient.getApi(this@UserDashboardActivity).assignTablet(token, AssignRequest(device_id = serial))
                 if (response.isSuccessful) {
-
+                    // Play Assign Sound
                     SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign)
-
                     Toast.makeText(this@UserDashboardActivity, "Assigned Successfully!", Toast.LENGTH_LONG).show()
                     loadData()
                 } else {
@@ -131,11 +132,10 @@ class UserDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                // Step 1: Tell Backend we want to return
-                val response = RetrofitClient.api.initiateReturn(token, ReturnInitRequest(serial))
+                // --- FIX 3: Use getApi(this) ---
+                val response = RetrofitClient.getApi(this@UserDashboardActivity).initiateReturn(token, ReturnInitRequest(serial))
 
                 if (response.isSuccessful) {
-                    // Step 2: Backend generated OTP. Now ask User to enter it.
                     showOtpInputDialog(serial)
                 } else {
                     Toast.makeText(this@UserDashboardActivity, "Failed to initiate return", Toast.LENGTH_SHORT).show()
@@ -176,13 +176,14 @@ class UserDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                // Step 3: Send OTP to backend to finalize
                 val req = ReturnVerifyRequest(device_id = serial, otp_code = otp)
-                val response = RetrofitClient.api.verifyReturn(token, req)
+
+                // --- FIX 4: Use getApi(this) ---
+                val response = RetrofitClient.getApi(this@UserDashboardActivity).verifyReturn(token, req)
 
                 if (response.isSuccessful) {
+                    // Play Return Sound
                     SoundManager.play(this@UserDashboardActivity, R.raw.melody_return)
-
                     Toast.makeText(this@UserDashboardActivity, "Success! Device Returned.", Toast.LENGTH_LONG).show()
                     loadData() // Refresh list to remove the device
                 } else {
