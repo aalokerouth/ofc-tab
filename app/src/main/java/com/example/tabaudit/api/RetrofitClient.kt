@@ -13,28 +13,29 @@ object RetrofitClient {
     private var retrofit: Retrofit? = null
     private var currentBaseUrl: String? = null
 
-    // Create a shared OkHttp client for better performance
-    private val client: OkHttpClient by lazy {
+    // Helper to build the client with the AuthInterceptor
+    private fun buildClient(context: Context): OkHttpClient {
         val logging = HttpLoggingInterceptor()
         logging.setLevel(HttpLoggingInterceptor.Level.BODY)
 
-        OkHttpClient.Builder()
+        return OkHttpClient.Builder()
             .addInterceptor(logging)
-            .connectTimeout(15, TimeUnit.SECONDS) // Handle slow LAN connections
+            // ADD THIS LINE TO ATTACH THE KILL SWITCH:
+            .addInterceptor(AuthInterceptor(context))
+            .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
             .build()
     }
 
-    // Now requires Context to get the saved IP
     fun getApi(context: Context): TabApiService {
         val ip = SessionManager.getServerIp(context)
         val newUrl = "http://$ip:8000/"
 
-        // Rebuild Retrofit only if the URL has changed or it's null
+        // Rebuild Retrofit if URL changes OR if it's null
         if (retrofit == null || newUrl != currentBaseUrl) {
             retrofit = Retrofit.Builder()
                 .baseUrl(newUrl)
-                .client(client)
+                .client(buildClient(context)) // Pass context to build the client
                 .addConverterFactory(GsonConverterFactory.create())
                 .build()
 
