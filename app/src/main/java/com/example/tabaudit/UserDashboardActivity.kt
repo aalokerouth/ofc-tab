@@ -1,11 +1,14 @@
 package com.example.tabaudit
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
 import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -22,6 +25,7 @@ class UserDashboardActivity : AppCompatActivity() {
 
     private lateinit var adapter: DevicesAdapter
     private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var containerUserHistory: LinearLayout
 
     // Store current devices so the user can select which one to send
     private var myDevicesList: List<DevicePossession> = emptyList()
@@ -29,6 +33,9 @@ class UserDashboardActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_user_dashboard)
+
+        // Initialize history container
+        containerUserHistory = findViewById(R.id.containerUserHistory)
 
         // 1. Setup Admin Button Visibility
         val btnAdmin = findViewById<Button>(R.id.btnGoToAdmin)
@@ -66,7 +73,7 @@ class UserDashboardActivity : AppCompatActivity() {
             loadData()
         }
 
-        // 5. Setup Scan Button
+        // 5. Setup Scan Button (ML Kit)
         findViewById<ExtendedFloatingActionButton>(R.id.fabScan).setOnClickListener {
             val scanner = GmsBarcodeScanning.getClient(this)
             scanner.startScan()
@@ -92,14 +99,21 @@ class UserDashboardActivity : AppCompatActivity() {
     }
 
     private fun loadData() {
-        // SessionManager already includes "Bearer " so we just use it directly!
         val token = SessionManager.getToken(this) ?: return
+        swipeRefresh.isRefreshing = true
         lifecycleScope.launch {
             try {
+                // Fetch current possessions
                 val response = RetrofitClient.getApi(this@UserDashboardActivity).getMyDevices(token)
                 if (response.isSuccessful) {
                     myDevicesList = response.body() ?: emptyList()
                     adapter.updateList(myDevicesList)
+                }
+
+                // Fetch Personal Activity History
+                val historyResponse = RetrofitClient.getApi(this@UserDashboardActivity).getUserHistory(token)
+                if (historyResponse.isSuccessful) {
+                    populateHistoryUI(historyResponse.body() ?: emptyList())
                 }
             } catch (e: Exception) {
                 Toast.makeText(this@UserDashboardActivity, "Error loading list", Toast.LENGTH_SHORT).show()
@@ -109,6 +123,54 @@ class UserDashboardActivity : AppCompatActivity() {
         }
     }
 
+    // --- HISTORY UI LOGIC ---
+    private fun populateHistoryUI(history: List<UserHistoryItem>) {
+        containerUserHistory.removeAllViews()
+
+        if (history.isEmpty()) {
+            addTextToHistory("No recent activity found.", isBold = false, color = Color.GRAY)
+            return
+        }
+
+        for (item in history) {
+            // Map status to readable labels
+            val actionText = when (item.action) {
+                "active" -> "Checked Out"
+                "returned" -> "Returned"
+                "transferred_out" -> "Transferred Out"
+                "transferred" -> "Received via Transfer"
+                else -> item.action
+            }
+
+            var content = "$actionText: ${item.tabName}\nDate: ${item.timestamp}"
+
+            // Show audit notes (e.g., who it was transferred to)
+            if (!item.notes.isNullOrBlank()) {
+                content += "\nDetails: ${item.notes}"
+            }
+
+            addTextToHistory(content, isBold = false)
+
+            // Divider line
+            val divider = View(this)
+            val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
+            params.setMargins(0, 8, 0, 8)
+            divider.layoutParams = params
+            divider.setBackgroundColor(Color.LTGRAY)
+            containerUserHistory.addView(divider)
+        }
+    }
+
+    private fun addTextToHistory(text: String, isBold: Boolean, color: Int = Color.BLACK) {
+        val tv = TextView(this)
+        tv.text = text
+        tv.setTextColor(color)
+        tv.textSize = 14f
+        tv.setPadding(0, 12, 0, 12)
+        if (isBold) tv.setTypeface(null, Typeface.BOLD)
+        containerUserHistory.addView(tv)
+    }
+
     // --- TRANSFER SEND LOGIC ---
     private fun showSendDialog() {
         if (myDevicesList.isEmpty()) {
@@ -116,7 +178,6 @@ class UserDashboardActivity : AppCompatActivity() {
             return
         }
 
-        // Create a list of readable names for the dialog
         val options = myDevicesList.map { "${it.device__tab_type__name} (${it.device__serial_number})" }.toTypedArray()
         var selectedIndex = 0
 
@@ -194,7 +255,7 @@ class UserDashboardActivity : AppCompatActivity() {
                 if (response.isSuccessful) {
                     try { SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign) } catch (e: Exception) {}
                     Toast.makeText(this@UserDashboardActivity, "Tab successfully claimed!", Toast.LENGTH_LONG).show()
-                    loadData() // Refresh list to show the new device
+                    loadData()
                 } else {
                     Toast.makeText(this@UserDashboardActivity, "Invalid or expired OTP", Toast.LENGTH_LONG).show()
                 }
@@ -204,7 +265,7 @@ class UserDashboardActivity : AppCompatActivity() {
         }
     }
 
-    // --- EXISTING ASSIGN/RETURN LOGIC BELOW ---
+    // --- EXISTING ASSIGN/RETURN LOGIC ---
     private fun assignTablet(serial: String) {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {

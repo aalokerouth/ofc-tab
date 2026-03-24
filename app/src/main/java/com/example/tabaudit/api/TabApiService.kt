@@ -48,4 +48,9 @@ interface TabApiService {
         @Header("Authorization") token: String,
         @Body request: TransferAcceptRequest
     ): Response<Map<String, String>>
+
+    @GET("api/user/history/")
+    suspend fun getUserHistory(
+        @Header("Authorization") token: String
+    ): Response<List<UserHistoryItem>>
 }

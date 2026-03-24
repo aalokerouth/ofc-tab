@@ -87,3 +87,10 @@ data class TransferInitResponse(
 )
 
 data class TransferAcceptRequest(val otp_code: String)
+
+data class UserHistoryItem(
+    @SerializedName("tab_name") val tabName: String,
+    val action: String,
+    val timestamp: String,
+    val notes: String? = null // To show transfer details
+)
