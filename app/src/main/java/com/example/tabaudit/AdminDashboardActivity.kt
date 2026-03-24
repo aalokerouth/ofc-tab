@@ -68,8 +68,9 @@ class AdminDashboardActivity : AppCompatActivity() {
             addTextToContainer(containerReturns, "No pending returns", isBold = false)
         } else {
             for (item in data.pending_returns) {
+                val warningColor = androidx.core.content.ContextCompat.getColor(this, R.color.brand_secondary)
                 val text = "OTP: ${item.otp_code}\nUser: ${item.username}\nDevice: ${item.serial}"
-                addTextToContainer(containerReturns, text, isBold = true, color = Color.RED)
+                addTextToContainer(containerReturns, text, isBold = true, color = warningColor)
 
                 val divider = TextView(this)
                 divider.layoutParams =

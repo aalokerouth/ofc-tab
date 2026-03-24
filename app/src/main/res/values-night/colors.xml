@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_primary">#5C6BC0</color>      <color name="brand_secondary">#FFB300</color>    <color name="brand_accent">#69F0AE</color>       <color name="bg_light">#121212</color>           <color name="surface_card">#1E1E1E</color>       <color name="text_main">#FFFFFF</color>          <color name="text_secondary">#B0BEC5</color>    <color name="divider_color">#37474F</color>      <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+</resources>

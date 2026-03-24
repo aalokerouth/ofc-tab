@@ -127,13 +127,11 @@ class UserDashboardActivity : AppCompatActivity() {
     private fun populateHistoryUI(history: List<UserHistoryItem>) {
         containerUserHistory.removeAllViews()
 
-        if (history.isEmpty()) {
-            addTextToHistory("No recent activity found.", isBold = false, color = Color.GRAY)
-            return
-        }
+        val primaryColor = androidx.core.content.ContextCompat.getColor(this, R.color.brand_primary)
+        val secondaryTextColor = androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary)
+        val dividerColor = androidx.core.content.ContextCompat.getColor(this, R.color.divider_color)
 
         for (item in history) {
-            // Map status to readable labels
             val actionText = when (item.action) {
                 "active" -> "Checked Out"
                 "returned" -> "Returned"
@@ -142,25 +140,23 @@ class UserDashboardActivity : AppCompatActivity() {
                 else -> item.action
             }
 
-            var content = "$actionText: ${item.tabName}\nDate: ${item.timestamp}"
+            // Header with Indigo (Brand Primary)
+            val header = "$actionText: ${item.tabName}"
+            addTextToHistory(header, isBold = true, color = primaryColor)
 
-            // Show audit notes (e.g., who it was transferred to)
-            if (!item.notes.isNullOrBlank()) {
-                content += "\nDetails: ${item.notes}"
-            }
+            // Details with Grey (Text Secondary)
+            val subText = "Date: ${item.timestamp}" + if (!item.notes.isNullOrBlank()) "\nDetails: ${item.notes}" else ""
+            addTextToHistory(subText, isBold = false, color = secondaryTextColor)
 
-            addTextToHistory(content, isBold = false)
-
-            // Divider line
+            // Divider that adapts to theme
             val divider = View(this)
-            val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 1)
-            params.setMargins(0, 8, 0, 8)
+            val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 2)
+            params.setMargins(0, 16, 0, 16)
             divider.layoutParams = params
-            divider.setBackgroundColor(Color.LTGRAY)
+            divider.setBackgroundColor(dividerColor)
             containerUserHistory.addView(divider)
         }
     }
-
     private fun addTextToHistory(text: String, isBold: Boolean, color: Int = Color.BLACK) {
         val tv = TextView(this)
         tv.text = text
