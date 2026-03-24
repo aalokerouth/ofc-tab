@@ -65,7 +65,8 @@ data class AssignmentOTPItem(
 data class LogItem(
     @SerializedName("user__username") val username: String,
     @SerializedName("tab__name") val tab_name: String,
-    val quantity: Int,
+    val action: String?, // Changed from quantity to action
+    val notes: String?,  // Nullable string so old production data doesn't crash the app
     val timestamp: String
 )
 
@@ -75,3 +76,14 @@ data class PendingReturnItem(
     @SerializedName("device__assigned_to__username") val username: String,
     val otp_code: String
 )
+
+// --- TRANSFER MODELS ---
+data class TransferInitRequest(val device_id: String)
+
+data class TransferInitResponse(
+    val message: String,
+    val transfer_otp: String,
+    val instructions: String
+)
+
+data class TransferAcceptRequest(val otp_code: String)

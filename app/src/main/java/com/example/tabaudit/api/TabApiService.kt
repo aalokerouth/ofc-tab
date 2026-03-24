@@ -36,4 +36,16 @@ interface TabApiService {
         @Header("Authorization") token: String,
         @Body request: ReturnVerifyRequest
     ): Response<Map<String, String>>
+
+    @POST("api/transfer/initiate/")
+    suspend fun initiateTransfer(
+        @Header("Authorization") token: String,
+        @Body request: TransferInitRequest
+    ): Response<TransferInitResponse>
+
+    @POST("api/transfer/accept/")
+    suspend fun acceptTransfer(
+        @Header("Authorization") token: String,
+        @Body request: TransferAcceptRequest
+    ): Response<Map<String, String>>
 }

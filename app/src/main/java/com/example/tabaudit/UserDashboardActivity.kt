@@ -13,10 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-import com.example.tabaudit.api.AssignRequest
-import com.example.tabaudit.api.ReturnInitRequest
-import com.example.tabaudit.api.ReturnVerifyRequest
-import com.example.tabaudit.api.RetrofitClient
+import com.example.tabaudit.api.*
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
 import com.google.mlkit.vision.codescanner.GmsBarcodeScanning
 import kotlinx.coroutines.launch
@@ -25,6 +22,9 @@ class UserDashboardActivity : AppCompatActivity() {
 
     private lateinit var adapter: DevicesAdapter
     private lateinit var swipeRefresh: SwipeRefreshLayout
+
+    // Store current devices so the user can select which one to send
+    private var myDevicesList: List<DevicePossession> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -78,36 +78,140 @@ class UserDashboardActivity : AppCompatActivity() {
                 }
         }
 
+        // 6. Setup Transfer Buttons
+        findViewById<Button>(R.id.btnSendTab).setOnClickListener {
+            showSendDialog()
+        }
+
+        findViewById<Button>(R.id.btnReceiveTab).setOnClickListener {
+            showReceiveDialog()
+        }
+
         // Load initial data
         loadData()
     }
 
     private fun loadData() {
+        // SessionManager already includes "Bearer " so we just use it directly!
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                // --- FIX 1: Use getApi(this) ---
                 val response = RetrofitClient.getApi(this@UserDashboardActivity).getMyDevices(token)
                 if (response.isSuccessful) {
-                    adapter.updateList(response.body() ?: emptyList())
+                    myDevicesList = response.body() ?: emptyList()
+                    adapter.updateList(myDevicesList)
                 }
             } catch (e: Exception) {
                 Toast.makeText(this@UserDashboardActivity, "Error loading list", Toast.LENGTH_SHORT).show()
             } finally {
-                swipeRefresh.isRefreshing = false // Stop animation
+                swipeRefresh.isRefreshing = false
             }
         }
     }
 
+    // --- TRANSFER SEND LOGIC ---
+    private fun showSendDialog() {
+        if (myDevicesList.isEmpty()) {
+            Toast.makeText(this, "You have no tabs to send.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Create a list of readable names for the dialog
+        val options = myDevicesList.map { "${it.device__tab_type__name} (${it.device__serial_number})" }.toTypedArray()
+        var selectedIndex = 0
+
+        AlertDialog.Builder(this)
+            .setTitle("Select Tab to Send")
+            .setSingleChoiceItems(options, 0) { _, which ->
+                selectedIndex = which
+            }
+            .setPositiveButton("Generate OTP") { _, _ ->
+                val selectedDevice = myDevicesList[selectedIndex].device__serial_number
+                initiateTransfer(selectedDevice)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun initiateTransfer(serial: String) {
+        val token = SessionManager.getToken(this) ?: return
+        lifecycleScope.launch {
+            try {
+                val response = RetrofitClient.getApi(this@UserDashboardActivity)
+                    .initiateTransfer(token, TransferInitRequest(serial))
+
+                if (response.isSuccessful) {
+                    val otp = response.body()?.transfer_otp
+                    AlertDialog.Builder(this@UserDashboardActivity)
+                        .setTitle("Transfer Code Generated")
+                        .setMessage("Your 6-digit code is:\n\n$otp\n\nShow this to the receiving user. It is valid for 10 minutes.")
+                        .setPositiveButton("Done", null)
+                        .setCancelable(false)
+                        .show()
+                } else {
+                    Toast.makeText(this@UserDashboardActivity, "Failed to initiate transfer", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@UserDashboardActivity, "Network Error", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // --- TRANSFER RECEIVE LOGIC ---
+    private fun showReceiveDialog() {
+        val input = EditText(this)
+        input.hint = "Enter 6-digit Transfer OTP"
+        input.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+
+        val container = LinearLayout(this)
+        container.orientation = LinearLayout.VERTICAL
+        container.setPadding(50, 40, 50, 10)
+        container.addView(input)
+
+        AlertDialog.Builder(this)
+            .setTitle("Receive a Tab")
+            .setMessage("Enter the OTP provided by the sender.")
+            .setView(container)
+            .setPositiveButton("Claim") { _, _ ->
+                val otp = input.text.toString()
+                if (otp.length == 6) {
+                    acceptTransfer(otp)
+                } else {
+                    Toast.makeText(this, "Invalid OTP format", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun acceptTransfer(otp: String) {
+        val token = SessionManager.getToken(this) ?: return
+        lifecycleScope.launch {
+            try {
+                val response = RetrofitClient.getApi(this@UserDashboardActivity)
+                    .acceptTransfer(token, TransferAcceptRequest(otp))
+
+                if (response.isSuccessful) {
+                    try { SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign) } catch (e: Exception) {}
+                    Toast.makeText(this@UserDashboardActivity, "Tab successfully claimed!", Toast.LENGTH_LONG).show()
+                    loadData() // Refresh list to show the new device
+                } else {
+                    Toast.makeText(this@UserDashboardActivity, "Invalid or expired OTP", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@UserDashboardActivity, "Network Error", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    // --- EXISTING ASSIGN/RETURN LOGIC BELOW ---
     private fun assignTablet(serial: String) {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                // --- FIX 2: Use getApi(this) ---
                 val response = RetrofitClient.getApi(this@UserDashboardActivity).assignTablet(token, AssignRequest(device_id = serial))
                 if (response.isSuccessful) {
-                    // Play Assign Sound
-                    SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign)
+                    try { SoundManager.play(this@UserDashboardActivity, R.raw.melody_assign) } catch (e: Exception) {}
                     Toast.makeText(this@UserDashboardActivity, "Assigned Successfully!", Toast.LENGTH_LONG).show()
                     loadData()
                 } else {
@@ -132,9 +236,7 @@ class UserDashboardActivity : AppCompatActivity() {
         val token = SessionManager.getToken(this) ?: return
         lifecycleScope.launch {
             try {
-                // --- FIX 3: Use getApi(this) ---
                 val response = RetrofitClient.getApi(this@UserDashboardActivity).initiateReturn(token, ReturnInitRequest(serial))
-
                 if (response.isSuccessful) {
                     showOtpInputDialog(serial)
                 } else {
@@ -177,15 +279,12 @@ class UserDashboardActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 val req = ReturnVerifyRequest(device_id = serial, otp_code = otp)
-
-                // --- FIX 4: Use getApi(this) ---
                 val response = RetrofitClient.getApi(this@UserDashboardActivity).verifyReturn(token, req)
 
                 if (response.isSuccessful) {
-                    // Play Return Sound
-                    SoundManager.play(this@UserDashboardActivity, R.raw.melody_return)
+                    try { SoundManager.play(this@UserDashboardActivity, R.raw.melody_return) } catch (e: Exception) {}
                     Toast.makeText(this@UserDashboardActivity, "Success! Device Returned.", Toast.LENGTH_LONG).show()
-                    loadData() // Refresh list to remove the device
+                    loadData()
                 } else {
                     Toast.makeText(this@UserDashboardActivity, "Wrong OTP. Try again.", Toast.LENGTH_LONG).show()
                 }

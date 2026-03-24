@@ -20,7 +20,6 @@ object RetrofitClient {
 
         return OkHttpClient.Builder()
             .addInterceptor(logging)
-            // ADD THIS LINE TO ATTACH THE KILL SWITCH:
             .addInterceptor(AuthInterceptor(context))
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(15, TimeUnit.SECONDS)
@@ -29,7 +28,10 @@ object RetrofitClient {
 
     fun getApi(context: Context): TabApiService {
         val ip = SessionManager.getServerIp(context)
-        val newUrl = "http://$ip:8000/"
+        val port = SessionManager.getServerPort(context)
+
+        // --- NEW: Using both IP and dynamic Port ---
+        val newUrl = "http://$ip:$port/"
 
         // Rebuild Retrofit if URL changes OR if it's null
         if (retrofit == null || newUrl != currentBaseUrl) {

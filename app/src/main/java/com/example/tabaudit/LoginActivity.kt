@@ -40,16 +40,14 @@ class LoginActivity : AppCompatActivity() {
 
         updateIpDisplay()
 
-        // --- NEW: AUTO-FILL EMPLOYEE ID ---
         // If the user was kicked out by AuthInterceptor, their ID will be waiting here.
         val prefs = getSharedPreferences("tab_audit_pref", Context.MODE_PRIVATE)
         val savedUser = prefs.getString("saved_username", "")
         if (!savedUser.isNullOrEmpty()) {
             etUser.setText(savedUser)
         }
-        // ----------------------------------
 
-        // --- SETTINGS BUTTON: Change IP ---
+        // --- SETTINGS BUTTON: Change IP & PORT ---
         findViewById<ImageButton>(R.id.btnSettings).setOnClickListener {
             showIpDialog()
         }
@@ -65,7 +63,7 @@ class LoginActivity : AppCompatActivity() {
 
             lifecycleScope.launch {
                 try {
-                    // IMPORTANT: Use .getApi(this) to ensure we use the dynamic IP
+                    // IMPORTANT: Use .getApi(this) to ensure we use the dynamic IP/Port
                     val api = RetrofitClient.getApi(this@LoginActivity)
 
                     val response = api.login(LoginRequest(user, pass))
@@ -73,14 +71,13 @@ class LoginActivity : AppCompatActivity() {
                     if (response.isSuccessful && response.body() != null) {
                         val auth = response.body()!!
 
-                        // --- NEW: SAVE EMPLOYEE ID FOR NEXT TIME ---
+                        // SAVE EMPLOYEE ID FOR NEXT TIME
                         getSharedPreferences("tab_audit_pref", Context.MODE_PRIVATE).edit()
                             .putString("saved_username", user)
                             .apply()
-                        // -------------------------------------------
 
                         // Play Sound
-                        SoundManager.play(this@LoginActivity, R.raw.melody_login)
+                        try { SoundManager.play(this@LoginActivity, R.raw.melody_login) } catch(e: Exception) {}
 
                         SessionManager.saveAuth(this@LoginActivity, auth.access, auth.user.role)
                         startActivity(Intent(this@LoginActivity, UserDashboardActivity::class.java))
@@ -89,7 +86,7 @@ class LoginActivity : AppCompatActivity() {
                         Toast.makeText(this@LoginActivity, "Login Failed: Invalid ID or Password", Toast.LENGTH_SHORT).show()
                     }
                 } catch (e: Exception) {
-                    Toast.makeText(this@LoginActivity, "Connection Error: Check IP or Wifi", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@LoginActivity, "Connection Error: Check IP, Port, or Wifi", Toast.LENGTH_LONG).show()
                     e.printStackTrace()
                 }
             }
@@ -98,26 +95,42 @@ class LoginActivity : AppCompatActivity() {
 
     private fun showIpDialog() {
         val currentIp = SessionManager.getServerIp(this)
+        val currentPort = SessionManager.getServerPort(this)
 
-        val input = EditText(this)
-        input.setText(currentIp)
-        input.hint = "e.g., 192.168.1.10"
+        val ipInput = EditText(this)
+        ipInput.setText(currentIp)
+        ipInput.hint = "IP (e.g., 192.168.1.10)"
+
+        val portInput = EditText(this)
+        portInput.setText(currentPort)
+        portInput.hint = "Port (e.g., 8000)"
+        portInput.inputType = android.text.InputType.TYPE_CLASS_NUMBER
 
         val container = LinearLayout(this)
         container.orientation = LinearLayout.VERTICAL
         container.setPadding(50, 40, 50, 10)
-        container.addView(input)
+        container.addView(ipInput)
+
+        // Add a tiny bit of space between the two inputs
+        val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+        params.topMargin = 20
+        container.addView(portInput, params)
 
         AlertDialog.Builder(this)
-            .setTitle("Set Server IP")
-            .setMessage("Enter the IP address of your Django PC.\nPort is fixed at :8000")
+            .setTitle("Set Server IP & Port")
+            .setMessage("Enter the details for your Django PC.")
             .setView(container)
             .setPositiveButton("Save") { _, _ ->
-                val newIp = input.text.toString().trim()
-                if (newIp.isNotEmpty()) {
+                val newIp = ipInput.text.toString().trim()
+                val newPort = portInput.text.toString().trim()
+
+                if (newIp.isNotEmpty() && newPort.isNotEmpty()) {
                     SessionManager.saveServerIp(this, newIp)
+                    SessionManager.saveServerPort(this, newPort)
                     updateIpDisplay()
-                    Toast.makeText(this, "IP Updated!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Server Settings Updated!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(this, "IP and Port cannot be empty!", Toast.LENGTH_SHORT).show()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -126,6 +139,7 @@ class LoginActivity : AppCompatActivity() {
 
     private fun updateIpDisplay() {
         val ip = SessionManager.getServerIp(this)
-        tvCurrentIp.text = "Server: $ip:8000"
+        val port = SessionManager.getServerPort(this)
+        tvCurrentIp.text = "Server: $ip:$port"
     }
 }
