@@ -61,6 +61,9 @@ data class AssignmentOTPItem(
     val tab_type__name: String
 )
 
+data class ForceReturnRequest(
+    val device_id: String
+)
 
 data class LogItem(
     @SerializedName("user__username") val username: String,

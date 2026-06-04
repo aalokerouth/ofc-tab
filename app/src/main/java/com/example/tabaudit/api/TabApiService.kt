@@ -49,6 +49,12 @@ interface TabApiService {
         @Body request: TransferAcceptRequest
     ): Response<Map<String, String>>
 
+    @POST("api/admin/force-return/")
+    suspend fun adminForceReturn(
+        @Header("Authorization") token: String,
+        @Body request: ForceReturnRequest
+    ): Response<Map<String, String>>
+
     @GET("api/user/history/")
     suspend fun getUserHistory(
         @Header("Authorization") token: String
